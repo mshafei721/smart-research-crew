@@ -6,9 +6,6 @@ for testing SSE endpoints and streams.
 """
 
 import pytest
-import asyncio
-import json
-from unittest.mock import AsyncMock
 from sse_starlette.sse import EventSourceResponse
 
 from .sse_test_utils import (

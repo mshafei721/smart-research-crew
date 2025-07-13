@@ -7,7 +7,7 @@ and production-ready defaults.
 
 import os
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator
+from pydantic import field_validator
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
@@ -138,7 +138,7 @@ def get_settings() -> Settings:
 def validate_environment():
     """Validate required environment variables are present."""
     try:
-        settings = get_settings()
+        get_settings()
         return True
     except Exception as e:
         print(f"Environment validation failed: {e}")

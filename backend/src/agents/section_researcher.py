@@ -6,7 +6,7 @@ with web search capabilities and structured JSON output.
 """
 
 import textwrap
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 
 from beeai_framework.agents.react import ReActAgent
 from beeai_framework.tools.search.duckduckgo import DuckDuckGoSearchTool
@@ -14,7 +14,7 @@ from beeai_framework.backend.chat import ChatModel
 from beeai_framework.memory.unconstrained_memory import UnconstrainedMemory
 
 from config import get_settings
-from config.logging import LoggerMixin, get_logger
+from config.logging import LoggerMixin
 
 
 class SectionResearcher(LoggerMixin):
@@ -38,7 +38,8 @@ class SectionResearcher(LoggerMixin):
         }
 
     Example:
-        >>> researcher = SectionResearcher("Introduction", "Academic tone, focus on recent developments")
+        >>> researcher = SectionResearcher("Introduction",
+        ...                                "Academic tone, focus on recent developments")
         >>> result = await researcher.agent.run("Research AI developments")
         >>> data = json.loads(result)
         >>> print(data["content"])
@@ -114,40 +115,46 @@ class SectionResearcher(LoggerMixin):
             f"""
             You are a specialized research agent responsible ONLY for the section "{self.section}".
             {guidelines_text}
-            
+
             CRITICAL OUTPUT FORMAT REQUIREMENTS:
             You MUST return ONLY valid JSON in this EXACT format:
             {{"content": "your markdown content here", "sources": ["url1", "url2", "url3"]}}
-            
+
             RESEARCH PROCESS:
             1. Search the web for {self.max_sources} high-quality, recent, and credible sources
             2. Analyze the information to create comprehensive section content
             3. Write well-structured Markdown content (maximum {self.max_content_words} words)
             4. Include proper citations using [1], [2], [3] format within the content
             5. Return structured JSON with content and source URLs
-            
+
             CONTENT QUALITY REQUIREMENTS:
             - Use proper Markdown formatting (headers, lists, emphasis)
             - Include specific facts, statistics, and examples where relevant
             - Maintain academic rigor and factual accuracy
             - Ensure citations are properly integrated into the text
             - Focus on recent information (prefer sources from last 2-3 years)
-            
+
             SOURCE QUALITY REQUIREMENTS:
             - Prioritize authoritative sources (.edu, .gov, reputable organizations)
             - Include diverse perspectives and up-to-date information
             - Avoid low-quality or unreliable sources
             - Ensure URLs are accessible and relevant
-            
+
             OUTPUT CONSTRAINTS:
             - Return ONLY the JSON object - no additional text, explanations, or formatting
             - The JSON must be valid and parseable
             - Do not include any text before or after the JSON
             - Ensure proper JSON escaping for quotes and special characters
             - Maximum {len(self.guidelines) + 500} characters for guidelines consideration
-            
+
             EXAMPLE OUTPUT:
-            {{"content": "## Key Findings\\n\\nRecent research shows [1] that artificial intelligence adoption has increased by 45% in 2023 [2]. This trend indicates...\\n\\n### Impact Analysis\\n\\n- **Efficiency**: 60% improvement in processing time [3]\\n- **Cost**: Average reduction of $50k annually [1]", "sources": ["https://example.edu/ai-research-2023", "https://techreport.org/ai-adoption-trends", "https://industry-analysis.com/efficiency-study"]}}
+            {{\"content\": \"## Key Findings\\n\\nRecent research shows [1] that artificial
+            intelligence adoption has increased by 45% in 2023 [2]. This trend
+            indicates...\\n\\n### Impact Analysis\\n\\n- **Efficiency**: 60% improvement
+            in processing time [3]\\n- **Cost**: Average reduction of $50k annually [1]\",
+            \"sources\": [\"https://example.edu/ai-research-2023\",
+            \"https://techreport.org/ai-adoption-trends\",
+            \"https://industry-analysis.com/efficiency-study\"]}}
         """
         )
 
@@ -174,7 +181,7 @@ class SectionResearcher(LoggerMixin):
         Validate agent output format and content.
 
         Args:
-            output: ReActAgentRunOutput from the agent
+            output: ReActAgentRunOutput from the agent or string for testing
 
         Returns:
             Parsed and validated JSON data
@@ -185,8 +192,17 @@ class SectionResearcher(LoggerMixin):
         import json
 
         try:
-            # Extract text from ReActAgentRunOutput object
-            output_text = output.result.text.strip()
+            # Handle both BeeAI output objects and test mocks (strings)
+            if hasattr(output, "result") and hasattr(output.result, "text"):
+                # Real BeeAI output object
+                output_text = output.result.text.strip()
+            elif isinstance(output, str):
+                # Test mock string
+                output_text = output.strip()
+            else:
+                # Fallback - try to convert to string
+                output_text = str(output).strip()
+
             data = json.loads(output_text)
 
             # Validate required fields

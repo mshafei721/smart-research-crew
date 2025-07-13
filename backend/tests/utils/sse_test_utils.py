@@ -8,13 +8,10 @@ endpoints and streams in the Smart Research Crew application.
 import asyncio
 import json
 import time
-from typing import List, Dict, Any, AsyncIterator, Optional, Union
-from unittest.mock import AsyncMock, patch
+from typing import List, Dict, Optional, Union
 import pytest
 from sse_starlette.sse import EventSourceResponse
 from fastapi.testclient import TestClient
-from fastapi import Request
-import httpx
 
 
 class SSETestEvent:

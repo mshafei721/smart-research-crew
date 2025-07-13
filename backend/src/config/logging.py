@@ -7,7 +7,7 @@ Structured logging setup with request tracing and performance monitoring.
 import logging
 import sys
 import uuid
-from typing import Dict, Any, Optional
+from typing import Optional
 from contextvars import ContextVar
 from datetime import datetime
 

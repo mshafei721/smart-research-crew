@@ -8,11 +8,10 @@ research results, reducing API calls and improving response times.
 import json
 import hashlib
 import time
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 import asyncio
-import logging
 
 import redis.asyncio as redis
 from redis.asyncio import Redis

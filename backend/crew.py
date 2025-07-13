@@ -11,19 +11,18 @@ import sys
 import os
 import json
 
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
+import uvicorn
 from rich.console import Console
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
+
+# Add src directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 # Import configuration and logging
-from config import get_settings, validate_environment
-from config.logging import (
+from config import get_settings, validate_environment  # noqa: E402
+from config.logging import (  # noqa: E402
     setup_logging,
     get_logger,
     set_request_context,
@@ -32,10 +31,10 @@ from config.logging import (
 )
 
 # Import application modules
-from agents import SectionResearcher, ReportAssembler
-from api import router
-from utils import ask
-from cache.cache_integration import cache_lifespan, CacheMiddleware, add_cache_routes
+from agents import SectionResearcher, ReportAssembler  # noqa: E402
+from api import router  # noqa: E402
+from utils import ask  # noqa: E402
+from cache.cache_integration import cache_lifespan, CacheMiddleware, add_cache_routes  # noqa: E402
 
 # Initialize logging
 logger = setup_logging()
@@ -55,23 +54,23 @@ app = FastAPI(
     version=app_settings.app_version,
     description="""
     Smart Research Crew API - Intelligent research automation platform
-    
+
     This API provides endpoints for automated research using AI agents that can:
     - Research multiple sections of a topic in parallel
     - Gather information from web sources
     - Generate structured reports with citations
     - Stream research progress in real-time
     - Cache results using Redis for improved performance
-    
+
     ## Authentication
     Currently no authentication required for development.
-    
+
     ## Rate Limiting
     Rate limiting can be enabled via environment variables.
-    
+
     ## Caching
     Redis caching can be enabled via REDIS_ENABLED environment variable.
-    
+
     ## Monitoring
     Request tracing and structured logging available.
     """,
@@ -177,19 +176,22 @@ async def run_cli_mode():
         topic = ask("📌  Research topic: ").strip()
         if len(topic) < app_settings.min_topic_length:
             console.print(
-                f"[red]Topic must be at least {app_settings.min_topic_length} characters long[/red]"
+                f"[red]Topic must be at least {app_settings.min_topic_length} "
+                f"characters long[/red]"
             )
             return
         if len(topic) > app_settings.max_topic_length:
             console.print(
-                f"[red]Topic must be less than {app_settings.max_topic_length} characters long[/red]"
+                f"[red]Topic must be less than {app_settings.max_topic_length} "
+                f"characters long[/red]"
             )
             return
 
         guide = ask("🧭  Guidelines / tone / depth: ").strip()
         if len(guide) > app_settings.max_guidelines_length:
             console.print(
-                f"[red]Guidelines must be less than {app_settings.max_guidelines_length} characters long[/red]"
+                f"[red]Guidelines must be less than "
+                f"{app_settings.max_guidelines_length} characters long[/red]"
             )
             return
 
@@ -204,7 +206,8 @@ async def run_cli_mode():
             return
 
         app_logger.info(
-            f"CLI research started: topic='{topic}', section_count={len(sections)}, sections={sections}"
+            f"CLI research started: topic='{topic}', "
+            f"section_count={len(sections)}, sections={sections}"
         )
 
         console.print(f"\n🚀  Spinning up agents for {len(sections)} sections…\n")
@@ -231,7 +234,8 @@ async def run_cli_mode():
                     error_msg = f"Timeout after {app_settings.section_timeout}s"
                     console.print(f"[red]Timeout researching {sec}: {error_msg}[/red]")
                     app_logger.error(
-                        f"Section research timeout: section='{sec}', timeout={app_settings.section_timeout}s"
+                        f"Section research timeout: section='{sec}', "
+                        f"timeout={app_settings.section_timeout}s"
                     )
                     section_results.append(
                         {"title": sec, "content": f"Error: {error_msg}", "sources": []}
@@ -331,7 +335,8 @@ For more configuration options, see .env.example
         else:
             # Interactive CLI mode
             console.print(
-                f"[dim]Using configuration: LLM={app_settings.llm_model}, Max Sections={app_settings.max_sections}[/dim]"
+                f"[dim]Using configuration: LLM={app_settings.llm_model}, "
+                f"Max Sections={app_settings.max_sections}[/dim]"
             )
             asyncio.run(run_cli_mode())
 

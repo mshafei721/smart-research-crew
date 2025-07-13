@@ -8,7 +8,7 @@ from unittest.mock import patch
 # Add the backend src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from utils import ask
+from utils import ask  # noqa: E402
 
 
 class TestHelperFunctions:

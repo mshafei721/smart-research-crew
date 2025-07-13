@@ -130,6 +130,38 @@ async def health_check(settings=Depends(get_current_settings)):
 
 
 @router.get(
+    "/settings",
+    tags=["config"],
+    summary="Get Configuration Settings",
+    description="Get current application configuration and settings",
+)
+async def get_settings_endpoint(settings=Depends(get_current_settings)):
+    """
+    Get current configuration settings.
+
+    Returns sanitized application settings excluding sensitive information.
+    """
+    logger.info("Settings requested")
+
+    # Return sanitized settings (exclude sensitive info)
+    response_data = {
+        "max_sections": settings.max_sections,
+        "min_topic_length": settings.min_topic_length,
+        "max_topic_length": settings.max_topic_length,
+        "max_guidelines_length": settings.max_guidelines_length,
+        "section_timeout": settings.section_timeout,
+        "request_timeout": settings.request_timeout,
+        "llm_model": settings.llm_model,
+        "app_version": settings.app_version,
+        "cache_enabled": settings.cache_enabled,
+        "max_sources": getattr(settings, "max_sources", 5),
+        "max_content_words": getattr(settings, "max_content_words", 250),
+    }
+
+    return JSONResponse(content=response_data)
+
+
+@router.get(
     "/sse",
     tags=["research"],
     summary="Stream Research Progress",
@@ -203,7 +235,8 @@ async def research_sse(
         if len(guidelines) > settings.max_guidelines_length:
             raise HTTPException(
                 status_code=400,
-                detail=f"Guidelines must be less than {settings.max_guidelines_length} characters long",
+                detail=f"Guidelines must be less than {settings.max_guidelines_length} "
+                f"characters long",
             )
 
         logger.info(
@@ -558,3 +591,301 @@ async def research_sse(
             }
 
     return EventSourceResponse(event_generator())
+
+
+async def research_sse_generator(
+    topic: str,
+    guidelines: str = "",
+    sections: str = "",
+    settings=None,
+):
+    """
+    Raw async generator for SSE events - for testing purposes.
+
+    This function exposes the event generator directly without wrapping
+    it in EventSourceResponse, making it easier to test.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    # Generate request ID for tracking
+    request_id = generate_request_id()
+    set_request_context(request_id)
+
+    # Validate input parameters
+    try:
+        # Parse and validate sections
+        section_titles = [s.strip() for s in sections.split(",") if s.strip()]
+        if not section_titles:
+            raise ValueError("At least one section is required")
+        if len(section_titles) > settings.max_sections:
+            raise ValueError(f"Maximum {settings.max_sections} sections allowed")
+
+        # Validate topic
+        if len(topic.strip()) < settings.min_topic_length:
+            raise ValueError(f"Topic must be at least {settings.min_topic_length} characters long")
+        if len(topic.strip()) > settings.max_topic_length:
+            raise ValueError(f"Topic must be less than {settings.max_topic_length} characters long")
+
+        # Validate guidelines
+        if len(guidelines) > settings.max_guidelines_length:
+            raise ValueError(
+                f"Guidelines must be less than {settings.max_guidelines_length} characters long"
+            )
+
+    except Exception as e:
+        # Yield error event and stop
+        yield {
+            "event": "error",
+            "data": json.dumps(
+                {"type": "error", "message": f"Invalid request: {str(e)}", "progress": 0}
+            ),
+        }
+        return
+
+    # Use the same event generator logic from the main function
+    section_results = []
+    completed_sections = 0
+
+    try:
+        # Check for complete cached research result first
+        cache = await get_cache()
+        if cache and cache.is_connected:
+            cached_research = await cache.get_cached_research_result(
+                topic, guidelines, section_titles
+            )
+            if cached_research:
+                # Send cached result directly
+                yield {
+                    "event": "status",
+                    "data": json.dumps(
+                        {
+                            "type": "status",
+                            "message": "Retrieving cached research...",
+                            "request_id": request_id,
+                            "progress": 90,
+                            "total_sections": len(section_titles),
+                            "cache_hit": True,
+                        }
+                    ),
+                }
+
+                yield {
+                    "event": "report_complete",
+                    "data": json.dumps(
+                        {
+                            "type": "report_complete",
+                            "content": cached_research,
+                            "sections_completed": len(section_titles),
+                            "total_sections": len(section_titles),
+                            "progress": 100,
+                            "cache_hit": True,
+                        }
+                    ),
+                }
+                return
+
+        # Send initial status
+        yield {
+            "event": "status",
+            "data": json.dumps(
+                {
+                    "type": "status",
+                    "message": "Starting research...",
+                    "request_id": request_id,
+                    "progress": 0,
+                    "total_sections": len(section_titles),
+                }
+            ),
+        }
+
+        # Process each section
+        for i, title in enumerate(section_titles, 1):
+            try:
+                # Check for cached section result first
+                cache = await get_cache()
+                cached_section = None
+                if cache and cache.is_connected:
+                    cached_section = await cache.get_cached_section_result(topic, title, guidelines)
+
+                if cached_section:
+                    # Use cached section result
+                    section_result = {"title": title, **cached_section}
+                    section_results.append(section_result)
+                    completed_sections += 1
+
+                    # Send section completion event for cached result
+                    yield {
+                        "event": "section_complete",
+                        "data": json.dumps(
+                            {
+                                "type": "section_complete",
+                                "section": title,
+                                "content": section_result.get("content", ""),
+                                "sources": section_result.get("sources", []),
+                                "format": "json",
+                                "progress": (i / len(section_titles)) * 80,  # 80% for sections
+                                "cache_hit": True,
+                            }
+                        ),
+                    }
+
+                else:
+                    # Send section start event
+                    yield {
+                        "event": "section_start",
+                        "data": json.dumps(
+                            {
+                                "type": "section_start",
+                                "section": title,
+                                "section_number": i,
+                                "total_sections": len(section_titles),
+                                "progress": (i - 1) / len(section_titles) * 100,
+                            }
+                        ),
+                    }
+
+                    # Create and run agent with timeout
+                    researcher = SectionResearcher(title, guidelines)
+
+                    result = await asyncio.wait_for(
+                        researcher.run_research(f"Research section '{title}' on topic: {topic}"),
+                        timeout=settings.section_timeout,
+                    )
+
+                    # The new run_research method returns validated data
+                    section_result = {"title": title, **result}
+                    format_type = "json"
+
+                    section_results.append(section_result)
+                    completed_sections += 1
+
+                    # Cache the section result
+                    if cache and cache.is_connected:
+                        await cache.cache_section_result(topic, title, guidelines, result)
+
+                    # Send section completion event
+                    yield {
+                        "event": "section_complete",
+                        "data": json.dumps(
+                            {
+                                "type": "section_complete",
+                                "section": title,
+                                "content": section_result.get("content", ""),
+                                "sources": section_result.get("sources", []),
+                                "format": format_type,
+                                "progress": (i / len(section_titles)) * 80,  # 80% for sections
+                            }
+                        ),
+                    }
+
+            except asyncio.TimeoutError:
+                error_msg = f"Section research timeout after {settings.section_timeout}s"
+                section_results.append(
+                    {
+                        "title": title,
+                        "content": f"Error: {error_msg}",
+                        "sources": [],
+                    }
+                )
+
+                yield {
+                    "event": "section_error",
+                    "data": json.dumps(
+                        {
+                            "type": "section_error",
+                            "section": title,
+                            "error": error_msg,
+                            "progress": (i / len(section_titles)) * 80,
+                        }
+                    ),
+                }
+
+            except Exception as e:
+                error_msg = f"Section research failed: {str(e)}"
+                section_results.append(
+                    {
+                        "title": title,
+                        "content": f"Error: {error_msg}",
+                        "sources": [],
+                    }
+                )
+
+                yield {
+                    "event": "section_error",
+                    "data": json.dumps(
+                        {
+                            "type": "section_error",
+                            "section": title,
+                            "error": error_msg,
+                            "progress": (i / len(section_titles)) * 80,
+                        }
+                    ),
+                }
+
+            # Small delay between sections
+            await asyncio.sleep(0.1)
+
+        # Assemble final report
+        yield {
+            "event": "status",
+            "data": json.dumps(
+                {
+                    "type": "status",
+                    "message": "Assembling final report...",
+                    "progress": 80,
+                }
+            ),
+        }
+
+        try:
+            assembler = ReportAssembler()
+
+            report = await asyncio.wait_for(
+                assembler.run_assembly(json.dumps(section_results)),
+                timeout=settings.request_timeout,
+            )
+
+            # Cache the complete research result
+            cache = await get_cache()
+            if cache and cache.is_connected:
+                await cache.cache_research_result(topic, guidelines, section_titles, report)
+
+            yield {
+                "event": "report_complete",
+                "data": json.dumps(
+                    {
+                        "type": "report_complete",
+                        "content": report,
+                        "sections_completed": completed_sections,
+                        "total_sections": len(section_titles),
+                        "progress": 100,
+                    }
+                ),
+            }
+
+        except asyncio.TimeoutError:
+            error_msg = f"Report assembly timeout after {settings.request_timeout}s"
+            yield {
+                "event": "error",
+                "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
+            }
+
+        except Exception as e:
+            error_msg = f"Report assembly failed: {str(e)}"
+            yield {
+                "event": "error",
+                "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
+            }
+
+    except Exception as e:
+        yield {
+            "event": "error",
+            "data": json.dumps(
+                {
+                    "type": "error",
+                    "message": f"Research failed: {str(e)}",
+                    "progress": 0,
+                }
+            ),
+        }

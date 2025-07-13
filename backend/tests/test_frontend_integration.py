@@ -9,26 +9,16 @@ import asyncio
 import json
 import time
 import pytest
-import httpx
+import sys
+import os
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from unittest.mock import AsyncMock, patch, MagicMock
-import sys
-import os
 
 # Add the backend src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from api import router
-from tests.utils import (
-    SSEEventExtractor,
-    SSETestClient,
-    SSEMockAgent,
-    SSETestScenarios,
-    extract_sse_events,
-    assert_sse_event_contains,
-    assert_sse_event_count,
-)
+from api import router  # noqa: E402
 
 
 class TestFrontendBackendIntegration:
@@ -49,7 +39,7 @@ class TestFrontendBackendIntegration:
     @pytest.fixture
     def sse_client(self, app):
         """Create SSE test client."""
-        return SSETestClient(app)
+        return TestClient(app)
 
     def test_health_endpoint_integration(self, client):
         """Test health endpoint that frontend uses for status checks."""
@@ -87,7 +77,9 @@ class TestFrontendBackendIntegration:
     @pytest.mark.asyncio
     async def test_sse_endpoint_integration_with_mocks(self, client):
         """Test SSE endpoint integration with mocked agents."""
-        section_responses, assembler_response = SSETestScenarios.create_research_workflow_mocks()
+        # Create test data
+        section_responses = ['{"content": "Test section", "sources": ["test.com"]}']
+        assembler_response = "# Test Report\n\nComplete test report"
 
         with (
             patch("api.routes.SectionResearcher") as mock_researcher,

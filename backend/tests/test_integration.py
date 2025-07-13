@@ -4,12 +4,11 @@ import pytest
 import sys
 import os
 from unittest.mock import AsyncMock, patch
-import asyncio
 
 # Add the backend src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from agents import SectionResearcher, ReportAssembler
+from agents import SectionResearcher, ReportAssembler  # noqa: E402
 
 
 class TestBackendIntegration:
@@ -84,7 +83,7 @@ class TestBackendIntegration:
             researcher = SectionResearcher(f"Section{i}", "Test guidelines")
             researchers.append(researcher)
 
-        assembler = ReportAssembler()
+        ReportAssembler()
 
         final_memory = process.memory_info().rss
         memory_increase = final_memory - initial_memory

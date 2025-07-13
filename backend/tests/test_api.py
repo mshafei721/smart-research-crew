@@ -3,19 +3,20 @@
 import pytest
 import sys
 import os
+import time
+import threading
 from unittest.mock import AsyncMock, patch
-import json
+from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 # Add the backend src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from api.routes import research_sse
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
+from api.routes import research_sse, research_sse_generator  # noqa: E402
+from api import router  # noqa: E402
 
 # Create test app with the routes
 app = FastAPI()
-from api import router
 
 app.include_router(router)
 client = TestClient(app)
@@ -104,7 +105,7 @@ class TestResearchSSEFunction:
         # Test the function
         async def collect_events():
             events = []
-            async for event in research_sse(
+            async for event in research_sse_generator(
                 "test topic", "test guidelines", "Introduction,Conclusion"
             ):
                 events.append(event)
@@ -184,7 +185,7 @@ class TestAPIErrorHandling:
 
             events = []
             try:
-                async for event in research_sse("test topic", "test guidelines", "Introduction"):
+                async for event in research_sse_generator("test topic", "test guidelines", "Introduction"):
                     events.append(event)
             except Exception:
                 pass  # Expected to handle errors gracefully
@@ -198,10 +199,9 @@ class TestAPIPerformance:
 
     def test_sse_endpoint_response_time(self):
         """Test that SSE endpoint responds quickly (even if it fails later)."""
-        import time
 
         start_time = time.time()
-        response = client.get(
+        client.get(
             "/sse",
             params={"topic": "quick test", "guidelines": "brief", "sections": "Introduction"},
         )
@@ -212,8 +212,6 @@ class TestAPIPerformance:
 
     def test_multiple_concurrent_requests(self):
         """Test handling multiple concurrent API requests."""
-        import threading
-        import time
 
         results = []
         errors = []

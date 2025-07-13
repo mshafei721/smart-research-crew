@@ -5,16 +5,17 @@ import sys
 import os
 import asyncio
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
 import time
+from unittest.mock import AsyncMock, patch, MagicMock
+from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 # Add the backend src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from agents import SectionResearcher, ReportAssembler
-from api.routes import research_sse
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
+from agents import SectionResearcher, ReportAssembler  # noqa: E402
+from api.routes import research_sse, research_sse_generator  # noqa: E402
+from api import router  # noqa: E402
 
 
 class TestE2EWorkflow:
@@ -31,8 +32,10 @@ class TestE2EWorkflow:
             # Mock section agent responses
             section_mock = AsyncMock()
             section_responses = [
-                '{"content": "Introduction content about AI", "sources": ["ai-intro.com", "ai-basics.org"]}',
-                '{"content": "Methods for AI research", "sources": ["methods.edu", "research-guide.net"]}',
+                '{"content": "Introduction content about AI", '
+                '"sources": ["ai-intro.com", "ai-basics.org"]}',
+                '{"content": "Methods for AI research", '
+                '"sources": ["methods.edu", "research-guide.net"]}',
             ]
             section_mock.run.side_effect = section_responses
             mock_section_agent.return_value = section_mock
@@ -48,7 +51,7 @@ class TestE2EWorkflow:
 ## 1. Introduction
 Introduction content about AI
 
-## 2. Methods  
+## 2. Methods
 Methods for AI research
 
 ## References
@@ -61,7 +64,7 @@ Methods for AI research
 
             # Run complete pipeline
             events = []
-            async for event in research_sse(
+            async for event in research_sse_generator(
                 topic="AI Research Trends",
                 guidelines="Academic format with citations",
                 sections="Introduction,Methods",
@@ -108,7 +111,7 @@ Methods for AI research
             # Run pipeline
             events = []
             try:
-                async for event in research_sse(
+                async for event in research_sse_generator(
                     topic="Test Topic", guidelines="Test guidelines", sections="Section1,Section2"
                 ):
                     events.append(event)
@@ -153,7 +156,7 @@ Methods for AI research
 
             start_time = time.time()
             events = []
-            async for event in research_sse(
+            async for event in research_sse_generator(
                 topic="Comprehensive AI Study",
                 guidelines="Detailed academic format",
                 sections=",".join(sections),
@@ -178,9 +181,6 @@ class TestE2EAPIIntegration:
 
     def test_sse_endpoint_complete_flow(self):
         """Test complete SSE endpoint flow with mocked backend."""
-        from fastapi import FastAPI
-        from api import router
-
         app = FastAPI()
         app.include_router(router)
         client = TestClient(app)
@@ -240,7 +240,7 @@ class TestE2EAPIIntegration:
             # Run multiple concurrent requests
             async def run_single_request(request_id):
                 events = []
-                async for event in research_sse(
+                async for event in research_sse_generator(
                     topic=f"Topic {request_id}",
                     guidelines="Test guidelines",
                     sections="Introduction",
@@ -293,7 +293,7 @@ Detailed research on quantum computing applications in AI
 
 ## References
 [1] nature.com/quantum-ai
-[2] arxiv.org/quantum-ml  
+[2] arxiv.org/quantum-ml
 [3] ieee.org/quantum-computing
 """
             assembler_mock.run.return_value = expected_report
@@ -301,7 +301,7 @@ Detailed research on quantum computing applications in AI
 
             # Run pipeline
             events = []
-            async for event in research_sse(
+            async for event in research_sse_generator(
                 topic="Quantum Computing in AI",
                 guidelines="Technical focus with recent sources",
                 sections="Applications",
@@ -386,7 +386,7 @@ class TestE2ESystemIntegration:
             events = []
             error_occurred = False
             try:
-                async for event in research_sse(
+                async for event in research_sse_generator(
                     topic="Test Topic", guidelines="Test guidelines", sections="Introduction"
                 ):
                     events.append(event)

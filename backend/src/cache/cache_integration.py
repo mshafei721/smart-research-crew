@@ -6,9 +6,8 @@ including middleware and startup/shutdown handlers.
 """
 
 from contextlib import asynccontextmanager
-from typing import Optional
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from config.settings import get_settings

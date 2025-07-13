@@ -9,10 +9,15 @@ interface Props {
   setReportMd: React.Dispatch<React.SetStateAction<string>>;
 }
 
-type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
+type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "error"
+  | "reconnecting";
 
 interface SSEError {
-  type: 'connection' | 'cors' | 'timeout' | 'server';
+  type: "connection" | "cors" | "timeout" | "server";
   message: string;
   details?: string;
 }
@@ -34,15 +39,18 @@ const RETRY_DELAYS = [1000, 3000, 5000]; // Progressive delays
 
 export default function Wizard({ sections, setSections, setReportMd }: Props) {
   // 🚀 SSE FIX VERSION 2.0 - If you see this log, the new version loaded!
-  console.log("🚀 SSE FIX VERSION 2.0 - Wizard component loaded with CORS fix!");
-  
+  console.log(
+    "🚀 SSE FIX VERSION 2.0 - Wizard component loaded with CORS fix!",
+  );
+
   const [topic, setTopic] = useState("");
   const [guidelines, setGuidelines] = useState("");
   const [sectionTitles, setSectionTitles] = useState<string[]>([""]);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState(0);
-  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("disconnected");
   const [connectionError, setConnectionError] = useState<SSEError | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const evtSourceRef = useRef<EventSource | null>(null);
@@ -57,31 +65,34 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
     };
   }, []);
 
-  const connectWithRetry = useCallback((retryAttempt = 0) => {
-    if (retryAttempt >= MAX_RETRIES) {
-      setConnectionState('error');
-      setConnectionError({
-        type: 'connection',
-        message: 'Max retry attempts reached',
-        details: `Failed after ${MAX_RETRIES} attempts`
-      });
-      setRunning(false);
-      return;
-    }
+  const connectWithRetry = useCallback(
+    (retryAttempt = 0) => {
+      if (retryAttempt >= MAX_RETRIES) {
+        setConnectionState("error");
+        setConnectionError({
+          type: "connection",
+          message: "Max retry attempts reached",
+          details: `Failed after ${MAX_RETRIES} attempts`,
+        });
+        setRunning(false);
+        return;
+      }
 
-    const delay = RETRY_DELAYS[retryAttempt] || 5000;
-    setTimeout(() => {
-      setRetryCount(retryAttempt + 1);
-      setConnectionState('reconnecting');
-      startResearch();
-    }, delay);
-  }, [topic, guidelines, sectionTitles]);
+      const delay = RETRY_DELAYS[retryAttempt] || 5000;
+      setTimeout(() => {
+        setRetryCount(retryAttempt + 1);
+        setConnectionState("reconnecting");
+        startResearch();
+      }, delay);
+    },
+    [topic, guidelines, sectionTitles],
+  );
 
   const startResearch = async () => {
     setRunning(true);
-    setConnectionState('connecting');
+    setConnectionState("connecting");
     setConnectionError(null);
-    
+
     const titles = sectionTitles.filter((t) => t.trim());
     const params = new URLSearchParams({
       topic,
@@ -97,15 +108,18 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
 
       const sseUrl = `/sse?${params}`;
       console.log("🚀 FIXED VERSION - Creating EventSource with URL:", sseUrl);
-      console.log("🚀 FIXED VERSION - Full URL will resolve to:", window.location.origin + sseUrl);
+      console.log(
+        "🚀 FIXED VERSION - Full URL will resolve to:",
+        window.location.origin + sseUrl,
+      );
       console.log("🚀 FIXED VERSION - This should NOT contain localhost:8000!");
-      
+
       const evtSource = new EventSource(sseUrl);
       evtSourceRef.current = evtSource;
 
       evtSource.onopen = () => {
-        console.log('SSE connection opened');
-        setConnectionState('connected');
+        console.log("SSE connection opened");
+        setConnectionState("connected");
         setConnectionError(null);
         setRetryCount(0);
       };
@@ -135,8 +149,8 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
 
             case "section_complete":
               // Use functional update to prevent race conditions
-              setSections(prev => {
-                const existing = prev.find(s => s.title === data.section);
+              setSections((prev) => {
+                const existing = prev.find((s) => s.title === data.section);
                 if (existing) return prev; // Prevent duplicates
                 const newSection: Section = {
                   title: data.section,
@@ -159,18 +173,18 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
               // Set the final report markdown
               setReportMd(data.content || "");
               setRunning(false);
-              setConnectionState('disconnected');
+              setConnectionState("disconnected");
               evtSource.close();
               console.log("Report complete!");
               break;
 
             case "error":
               console.error("Research error:", data.message);
-              setConnectionState('error');
+              setConnectionState("error");
               setConnectionError({
-                type: 'server',
-                message: data.message || 'Research failed',
-                details: 'Server encountered an error during research'
+                type: "server",
+                message: data.message || "Research failed",
+                details: "Server encountered an error during research",
               });
               evtSource.close();
               setRunning(false);
@@ -182,9 +196,9 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
         } catch (err) {
           console.error("Failed to parse SSE event:", err);
           setConnectionError({
-            type: 'server',
-            message: 'Invalid server response format',
-            details: String(err)
+            type: "server",
+            message: "Invalid server response format",
+            details: String(err),
           });
         }
       };
@@ -194,40 +208,43 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
           error: err,
           readyState: evtSource.readyState,
           url: evtSource.url,
-          withCredentials: evtSource.withCredentials
+          withCredentials: evtSource.withCredentials,
         });
-        
+
         // Log the actual URL being used
         console.log("EventSource URL being used:", evtSource.url);
-        console.log("EventSource readyState:", evtSource.readyState, "(0=CONNECTING, 1=OPEN, 2=CLOSED)");
-        
+        console.log(
+          "EventSource readyState:",
+          evtSource.readyState,
+          "(0=CONNECTING, 1=OPEN, 2=CLOSED)",
+        );
+
         if (evtSource.readyState === EventSource.CLOSED) {
-          setConnectionState('error');
+          setConnectionState("error");
           setConnectionError({
-            type: 'connection',
-            message: 'Connection closed by server',
-            details: `Server terminated connection. URL: ${evtSource.url}`
+            type: "connection",
+            message: "Connection closed by server",
+            details: `Server terminated connection. URL: ${evtSource.url}`,
           });
         } else if (evtSource.readyState === EventSource.CONNECTING) {
-          setConnectionState('reconnecting');
+          setConnectionState("reconnecting");
           setConnectionError({
-            type: 'connection',
-            message: 'Attempting to reconnect...',
-            details: `Connection lost, retrying. URL: ${evtSource.url}`
+            type: "connection",
+            message: "Attempting to reconnect...",
+            details: `Connection lost, retrying. URL: ${evtSource.url}`,
           });
         }
-        
+
         setRunning(false);
       };
-
     } catch (err) {
       console.error("Failed to start research:", err);
       setRunning(false);
-      setConnectionState('error');
+      setConnectionState("error");
       setConnectionError({
-        type: 'cors',
-        message: 'Failed to establish connection',
-        details: String(err)
+        type: "cors",
+        message: "Failed to establish connection",
+        details: String(err),
       });
     }
   };
@@ -299,33 +316,43 @@ export default function Wizard({ sections, setSections, setReportMd }: Props) {
         </motion.button>
 
         {/* Connection Status Indicator */}
-        {(running || connectionState !== 'disconnected') && (
+        {(running || connectionState !== "disconnected") && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             className="mt-4 p-3 bg-slate-700/50 rounded-lg"
           >
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${
-                connectionState === 'connected' ? 'bg-green-400 animate-pulse' : 
-                connectionState === 'connecting' || connectionState === 'reconnecting' ? 'bg-yellow-400 animate-pulse' : 
-                'bg-red-400'
-              }`} />
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  connectionState === "connected"
+                    ? "bg-green-400 animate-pulse"
+                    : connectionState === "connecting" ||
+                        connectionState === "reconnecting"
+                      ? "bg-yellow-400 animate-pulse"
+                      : "bg-red-400"
+                }`}
+              />
               <span className="text-sm">
-                {connectionState === 'connected' && 'Connected to research service'}
-                {connectionState === 'connecting' && 'Connecting to research service...'}
-                {connectionState === 'reconnecting' && 'Reconnecting...'}
-                {connectionState === 'error' && 'Connection failed'}
+                {connectionState === "connected" &&
+                  "Connected to research service"}
+                {connectionState === "connecting" &&
+                  "Connecting to research service..."}
+                {connectionState === "reconnecting" && "Reconnecting..."}
+                {connectionState === "error" && "Connection failed"}
               </span>
             </div>
-            
+
             {connectionError && (
               <div className="mt-2 text-xs text-red-300">
-                <strong>{connectionError.type.toUpperCase()}:</strong> {connectionError.message}
+                <strong>{connectionError.type.toUpperCase()}:</strong>{" "}
+                {connectionError.message}
                 {connectionError.details && (
-                  <div className="text-slate-400 mt-1">{connectionError.details}</div>
+                  <div className="text-slate-400 mt-1">
+                    {connectionError.details}
+                  </div>
                 )}
-                {connectionState === 'error' && retryCount < MAX_RETRIES && (
+                {connectionState === "error" && retryCount < MAX_RETRIES && (
                   <button
                     onClick={() => connectWithRetry(retryCount)}
                     className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-xs"
