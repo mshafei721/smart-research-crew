@@ -7,17 +7,22 @@ error handling, and observability.
 
 import asyncio
 import json
-from typing import Optional, List, Dict, Any
+from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from sse_starlette.sse import EventSourceResponse
 
 from agents import SectionResearcher, ReportAssembler
 from config import get_settings
-from config.logging import get_logger, log_performance, set_request_context, generate_request_id
+from config.logging import (
+    get_logger,
+    log_performance,
+    set_request_context,
+    generate_request_id,
+)
 from cache.redis_cache import get_cache
 from cache.cache_integration import check_cache_health
 
@@ -32,10 +37,15 @@ class ResearchRequest(BaseModel):
         ..., min_length=3, max_length=200, description="Research topic to investigate"
     )
     guidelines: str = Field(
-        default="", max_length=1000, description="Research guidelines, tone, and depth requirements"
+        default="",
+        max_length=1000,
+        description="Research guidelines, tone, and depth requirements",
     )
     sections: List[str] = Field(
-        ..., min_length=1, max_length=10, description="List of section titles to research"
+        ...,
+        min_length=1,
+        max_length=10,
+        description="List of section titles to research",
     )
 
     @field_validator("sections")
@@ -125,13 +135,13 @@ async def health_check(settings=Depends(get_current_settings)):
     summary="Stream Research Progress",
     description="""
     Server-sent events endpoint for real-time research streaming.
-    
+
     Initiates a research process across multiple sections and streams:
     - Section research progress
     - Individual section completion
     - Final report assembly
     - Error handling and recovery
-    
+
     The endpoint returns a stream of events with different types:
     - `status`: General progress updates
     - `section_start`: Beginning of section research
@@ -139,7 +149,7 @@ async def health_check(settings=Depends(get_current_settings)):
     - `section_error`: Section research failed
     - `report_complete`: Final report ready
     - `error`: Critical errors
-    
+
     Each event contains structured JSON data with progress information.
     """,
 )
@@ -148,9 +158,13 @@ async def research_sse(
         ..., min_length=3, max_length=200, description="Research topic to investigate"
     ),
     guidelines: str = Query(
-        default="", max_length=1000, description="Research guidelines, tone, and depth requirements"
+        default="",
+        max_length=1000,
+        description="Research guidelines, tone, and depth requirements",
     ),
-    sections: str = Query(..., description="Comma-separated list of section titles to research"),
+    sections: str = Query(
+        ..., description="Comma-separated list of section titles to research"
+    ),
     settings=Depends(get_current_settings),
 ):
     """
@@ -168,10 +182,13 @@ async def research_sse(
         # Parse and validate sections
         section_titles = [s.strip() for s in sections.split(",") if s.strip()]
         if not section_titles:
-            raise HTTPException(status_code=400, detail="At least one section is required")
+            raise HTTPException(
+                status_code=400, detail="At least one section is required"
+            )
         if len(section_titles) > settings.max_sections:
             raise HTTPException(
-                status_code=400, detail=f"Maximum {settings.max_sections} sections allowed"
+                status_code=400,
+                detail=f"Maximum {settings.max_sections} sections allowed",
             )
 
         # Validate topic
@@ -195,16 +212,20 @@ async def research_sse(
 
         logger.info(
             "SSE research request started",
-            request_id=request_id,
-            topic=topic,
-            section_count=len(section_titles),
-            sections=section_titles,
+            extra={
+                "request_id": request_id,
+                "topic": topic,
+                "section_count": len(section_titles),
+                "sections": section_titles,
+            },
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Request validation failed", exc_info=True, request_id=request_id)
+        logger.error(
+            "Request validation failed", exc_info=True, extra={"request_id": request_id}
+        )
         raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
 
     async def event_generator():
@@ -221,7 +242,8 @@ async def research_sse(
                 )
                 if cached_research:
                     logger.info(
-                        "Serving cached research result", request_id=request_id, cache_hit=True
+                        "Serving cached research result",
+                        extra={"request_id": request_id, "cache_hit": True},
                     )
 
                     # Send cached result directly
@@ -272,10 +294,12 @@ async def research_sse(
             for i, title in enumerate(section_titles, 1):
                 logger.info(
                     "Processing section",
-                    request_id=request_id,
-                    section=title,
-                    section_number=i,
-                    total_sections=len(section_titles),
+                    extra={
+                        "request_id": request_id,
+                        "section": title,
+                        "section_number": i,
+                        "total_sections": len(section_titles),
+                    },
                 )
 
                 try:
@@ -295,9 +319,11 @@ async def research_sse(
 
                         logger.info(
                             "Using cached section result",
-                            request_id=request_id,
-                            section=title,
-                            cache_hit=True,
+                            extra={
+                                "request_id": request_id,
+                                "section": title,
+                                "cache_hit": True,
+                            },
                         )
 
                         # Send section completion event for cached result
@@ -310,7 +336,8 @@ async def research_sse(
                                     "content": section_result.get("content", ""),
                                     "sources": section_result.get("sources", []),
                                     "format": "json",
-                                    "progress": (i / len(section_titles)) * 80,  # 80% for sections
+                                    "progress": (i / len(section_titles))
+                                    * 80,  # 80% for sections
                                     "cache_hit": True,
                                 }
                             ),
@@ -351,7 +378,9 @@ async def research_sse(
 
                             # Cache the section result
                             if cache and cache.is_connected:
-                                await cache.cache_section_result(topic, title, guidelines, result)
+                                await cache.cache_section_result(
+                                    topic, title, guidelines, result
+                                )
 
                             # Send section completion event
                             yield {
@@ -371,22 +400,32 @@ async def research_sse(
 
                             logger.info(
                                 "Section completed",
-                                request_id=request_id,
-                                section=title,
-                                format=format_type,
+                                extra={
+                                    "request_id": request_id,
+                                    "section": title,
+                                    "format": format_type,
+                                },
                             )
 
                 except asyncio.TimeoutError:
-                    error_msg = f"Section research timeout after {settings.section_timeout}s"
+                    error_msg = (
+                        f"Section research timeout after {settings.section_timeout}s"
+                    )
                     logger.error(
                         "Section research timeout",
-                        request_id=request_id,
-                        section=title,
-                        timeout=settings.section_timeout,
+                        extra={
+                            "request_id": request_id,
+                            "section": title,
+                            "timeout": settings.section_timeout,
+                        },
                     )
 
                     section_results.append(
-                        {"title": title, "content": f"Error: {error_msg}", "sources": []}
+                        {
+                            "title": title,
+                            "content": f"Error: {error_msg}",
+                            "sources": [],
+                        }
                     )
 
                     yield {
@@ -405,13 +444,19 @@ async def research_sse(
                     error_msg = f"Section research failed: {str(e)}"
                     logger.error(
                         "Section research failed",
-                        request_id=request_id,
-                        section=title,
                         exc_info=True,
+                        extra={
+                            "request_id": request_id,
+                            "section": title,
+                        },
                     )
 
                     section_results.append(
-                        {"title": title, "content": f"Error: {error_msg}", "sources": []}
+                        {
+                            "title": title,
+                            "content": f"Error: {error_msg}",
+                            "sources": [],
+                        }
                     )
 
                     yield {
@@ -433,7 +478,11 @@ async def research_sse(
             yield {
                 "event": "status",
                 "data": json.dumps(
-                    {"type": "status", "message": "Assembling final report...", "progress": 80}
+                    {
+                        "type": "status",
+                        "message": "Assembling final report...",
+                        "progress": 80,
+                    }
                 ),
             }
 
@@ -449,7 +498,9 @@ async def research_sse(
                     # Cache the complete research result
                     cache = await get_cache()
                     if cache and cache.is_connected:
-                        await cache.cache_research_result(topic, guidelines, section_titles, report)
+                        await cache.cache_research_result(
+                            topic, guidelines, section_titles, report
+                        )
 
                     yield {
                         "event": "report_complete",
@@ -466,40 +517,60 @@ async def research_sse(
 
                     logger.info(
                         "Research completed successfully",
-                        request_id=request_id,
-                        sections_completed=completed_sections,
-                        total_sections=len(section_titles),
+                        extra={
+                            "request_id": request_id,
+                            "sections_completed": completed_sections,
+                            "total_sections": len(section_titles),
+                        },
                     )
 
             except asyncio.TimeoutError:
                 error_msg = f"Report assembly timeout after {settings.request_timeout}s"
                 logger.error(
                     "Report assembly timeout",
-                    request_id=request_id,
-                    timeout=settings.request_timeout,
+                    extra={
+                        "request_id": request_id,
+                        "timeout": settings.request_timeout,
+                    },
                 )
 
                 yield {
                     "event": "error",
-                    "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
+                    "data": json.dumps(
+                        {"type": "error", "message": error_msg, "progress": 80}
+                    ),
                 }
 
             except Exception as e:
                 error_msg = f"Report assembly failed: {str(e)}"
-                logger.error("Report assembly failed", request_id=request_id, exc_info=True)
+                logger.error(
+                    "Report assembly failed",
+                    exc_info=True,
+                    extra={"request_id": request_id},
+                )
 
                 yield {
                     "event": "error",
-                    "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
+                    "data": json.dumps(
+                        {"type": "error", "message": error_msg, "progress": 80}
+                    ),
                 }
 
         except Exception as e:
-            logger.error("SSE event generation failed", request_id=request_id, exc_info=True)
+            logger.error(
+                "SSE event generation failed",
+                exc_info=True,
+                extra={"request_id": request_id},
+            )
 
             yield {
                 "event": "error",
                 "data": json.dumps(
-                    {"type": "error", "message": f"Research failed: {str(e)}", "progress": 0}
+                    {
+                        "type": "error",
+                        "message": f"Research failed: {str(e)}",
+                        "progress": 0,
+                    }
                 ),
             }
 

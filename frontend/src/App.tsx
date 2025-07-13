@@ -3,7 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import Wizard from "./Wizard";
 import Report from "./Report";
 
-export type Section = { title: string; content: string; sources: { url: string; title: string }[] };
+export type Section = {
+  title: string;
+  content: string;
+  sources: { url: string; title: string }[];
+};
 
 export default function App() {
   const [sections, setSections] = useState<Section[]>([]);

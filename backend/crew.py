@@ -114,19 +114,23 @@ async def log_requests(request: Request, call_next):
     with log_performance(f"{request.method} {request.url.path}", app_logger):
         app_logger.info(
             "Request received",
-            method=request.method,
-            path=request.url.path,
-            query_params=str(request.query_params),
-            client_host=request.client.host if request.client else "unknown",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "query_params": str(request.query_params),
+                "client_host": request.client.host if request.client else "unknown",
+            },
         )
 
         try:
             response = await call_next(request)
-            app_logger.info("Request completed", status_code=response.status_code)
+            app_logger.info("Request completed", extra={"status_code": response.status_code})
             return response
         except Exception as e:
             app_logger.error(
-                "Request failed", exc_info=True, error_type=type(e).__name__, error_message=str(e)
+                "Request failed",
+                exc_info=True,
+                extra={"error_type": type(e).__name__, "error_message": str(e)},
             )
             raise
 
@@ -136,7 +140,9 @@ async def log_requests(request: Request, call_next):
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle unhandled exceptions."""
     app_logger.error(
-        "Unhandled exception occurred", exc_info=True, path=request.url.path, method=request.method
+        "Unhandled exception occurred",
+        exc_info=True,
+        extra={"path": request.url.path, "method": request.method},
     )
 
     if app_settings.debug:

@@ -1,6 +1,6 @@
-import { beforeAll, afterEach, afterAll } from 'vitest'
-import { cleanup } from '@testing-library/react'
-import '@testing-library/jest-dom'
+import { beforeAll, afterEach, afterAll } from "vitest";
+import { cleanup } from "@testing-library/react";
+import "@testing-library/jest-dom";
 
 // Mock EventSource for SSE testing
 global.EventSource = class EventSource {
@@ -8,17 +8,17 @@ global.EventSource = class EventSource {
   close() {}
   addEventListener() {}
   removeEventListener() {}
-} as any
+} as any;
 
 beforeAll(() => {
   // Setup code that runs before all tests
-})
+});
 
 afterEach(() => {
   // Cleanup after each test
-  cleanup()
-})
+  cleanup();
+});
 
 afterAll(() => {
   // Cleanup code that runs after all tests
-})
+});
