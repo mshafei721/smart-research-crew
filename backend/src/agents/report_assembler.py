@@ -300,12 +300,12 @@ class ReportAssembler(LoggerMixin):
             self.log_error("Input validation failed", exc_info=True)
             raise ValueError(f"Input validation failed: {str(e)}") from e
 
-    def validate_output(self, output: str) -> str:
+    def validate_output(self, output) -> str:
         """
         Validate report output format and quality.
 
         Args:
-            output: Generated report content
+            output: ReActAgentRunOutput from the agent
 
         Returns:
             Validated and cleaned report content
@@ -313,39 +313,42 @@ class ReportAssembler(LoggerMixin):
         Raises:
             ValueError: If output format is invalid
         """
-        if not output or not output.strip():
+        # Extract text from ReActAgentRunOutput object
+        output_text = output.result.text.strip()
+        
+        if not output_text or not output_text.strip():
             raise ValueError("Report output cannot be empty")
 
-        output = output.strip()
+        output_text = output_text.strip()
 
         # Check length constraints
-        if len(output) > self.max_report_length:
+        if len(output_text) > self.max_report_length:
             self.log_warning(
                 "Report exceeds maximum length",
-                actual_length=len(output),
+                actual_length=len(output_text),
                 max_length=self.max_report_length,
             )
 
         # Basic structure validation
         required_sections = ["#", "## Table of Contents", "## References"]
         for section in required_sections:
-            if section not in output:
+            if section not in output_text:
                 self.log_warning(f"Missing expected section: {section}")
 
         # Count sections and references
-        section_count = output.count("## ") - 2  # Exclude ToC and References
+        section_count = output_text.count("## ") - 2  # Exclude ToC and References
         reference_count = len(
-            [line for line in output.split("\n") if line.strip().startswith("[") and "] " in line]
+            [line for line in output_text.split("\n") if line.strip().startswith("[") and "] " in line]
         )
 
         self.log_info(
             "Output validation completed",
-            report_length=len(output),
+            report_length=len(output_text),
             section_count=section_count,
             reference_count=reference_count,
         )
 
-        return output
+        return output_text
 
     def get_assembly_config(self) -> Dict[str, Any]:
         """

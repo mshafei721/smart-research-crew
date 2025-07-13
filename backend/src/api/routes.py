@@ -122,7 +122,7 @@ async def health_check(settings=Depends(get_current_settings)):
     response_data = {
         "status": "healthy",
         "version": settings.app_version,
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.utcnow().isoformat(),
         "cache": cache_health,
     }
 
@@ -162,9 +162,7 @@ async def research_sse(
         max_length=1000,
         description="Research guidelines, tone, and depth requirements",
     ),
-    sections: str = Query(
-        ..., description="Comma-separated list of section titles to research"
-    ),
+    sections: str = Query(..., description="Comma-separated list of section titles to research"),
     settings=Depends(get_current_settings),
 ):
     """
@@ -182,9 +180,7 @@ async def research_sse(
         # Parse and validate sections
         section_titles = [s.strip() for s in sections.split(",") if s.strip()]
         if not section_titles:
-            raise HTTPException(
-                status_code=400, detail="At least one section is required"
-            )
+            raise HTTPException(status_code=400, detail="At least one section is required")
         if len(section_titles) > settings.max_sections:
             raise HTTPException(
                 status_code=400,
@@ -223,9 +219,7 @@ async def research_sse(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Request validation failed", exc_info=True, extra={"request_id": request_id}
-        )
+        logger.error("Request validation failed", exc_info=True, extra={"request_id": request_id})
         raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
 
     async def event_generator():
@@ -336,8 +330,7 @@ async def research_sse(
                                     "content": section_result.get("content", ""),
                                     "sources": section_result.get("sources", []),
                                     "format": "json",
-                                    "progress": (i / len(section_titles))
-                                    * 80,  # 80% for sections
+                                    "progress": (i / len(section_titles)) * 80,  # 80% for sections
                                     "cache_hit": True,
                                 }
                             ),
@@ -378,9 +371,7 @@ async def research_sse(
 
                             # Cache the section result
                             if cache and cache.is_connected:
-                                await cache.cache_section_result(
-                                    topic, title, guidelines, result
-                                )
+                                await cache.cache_section_result(topic, title, guidelines, result)
 
                             # Send section completion event
                             yield {
@@ -408,9 +399,7 @@ async def research_sse(
                             )
 
                 except asyncio.TimeoutError:
-                    error_msg = (
-                        f"Section research timeout after {settings.section_timeout}s"
-                    )
+                    error_msg = f"Section research timeout after {settings.section_timeout}s"
                     logger.error(
                         "Section research timeout",
                         extra={
@@ -498,9 +487,7 @@ async def research_sse(
                     # Cache the complete research result
                     cache = await get_cache()
                     if cache and cache.is_connected:
-                        await cache.cache_research_result(
-                            topic, guidelines, section_titles, report
-                        )
+                        await cache.cache_research_result(topic, guidelines, section_titles, report)
 
                     yield {
                         "event": "report_complete",
@@ -536,9 +523,7 @@ async def research_sse(
 
                 yield {
                     "event": "error",
-                    "data": json.dumps(
-                        {"type": "error", "message": error_msg, "progress": 80}
-                    ),
+                    "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
                 }
 
             except Exception as e:
@@ -551,9 +536,7 @@ async def research_sse(
 
                 yield {
                     "event": "error",
-                    "data": json.dumps(
-                        {"type": "error", "message": error_msg, "progress": 80}
-                    ),
+                    "data": json.dumps({"type": "error", "message": error_msg, "progress": 80}),
                 }
 
         except Exception as e:

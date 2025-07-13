@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Frontend Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .status { padding: 10px; margin: 5px 0; border-radius: 5px; }
+        .connecting { background: #fff3cd; }
+        .connected { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; height: 400px; overflow-y: auto; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>Frontend SSE Connection Test</h1>
+    <p>This tests the same URL that the React frontend uses: <code>/sse</code></p>
+    
+    <div id="status" class="status">Disconnected</div>
+    
+    <button onclick="testConnection()">Test SSE Connection</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <div id="log" class="log"></div>
+
+    <script>
+        let eventSource = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(state, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${state}`;
+            statusDiv.textContent = message;
+        }
+        
+        function testConnection() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            const params = new URLSearchParams({
+                topic: 'Test Topic for SSE Connection',
+                guidelines: 'Brief academic overview',
+                sections: 'Introduction,Conclusion'
+            });
+            
+            const url = `/sse?${params}`;
+            log(`Attempting to connect to: ${url}`);
+            updateStatus('connecting', 'Connecting...');
+            
+            try {
+                eventSource = new EventSource(url);
+                
+                eventSource.onopen = function(e) {
+                    log('✅ SSE connection opened successfully');
+                    log(`ReadyState: ${eventSource.readyState} (1=OPEN)`);
+                    updateStatus('connected', 'Connected - receiving events');
+                };
+                
+                eventSource.onmessage = function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        log(`📨 Event received: ${data.type}`);
+                        if (data.type === 'status') {
+                            log(`   Status: ${data.message} (${data.progress}%)`);
+                        } else if (data.type === 'section_complete') {
+                            log(`   Section: ${data.section} completed`);
+                        } else if (data.type === 'report_complete') {
+                            log(`   ✅ Report complete! (${data.content?.length || 0} chars)`);
+                            updateStatus('connected', 'Research completed successfully');
+                        }
+                    } catch (err) {
+                        log(`❌ Failed to parse event data: ${err}`);
+                    }
+                };
+                
+                eventSource.onerror = function(e) {
+                    log(`❌ SSE error occurred`);
+                    log(`   ReadyState: ${eventSource.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSED)`);
+                    log(`   Event details: ${JSON.stringify(e)}`);
+                    updateStatus('error', 'Connection error occurred');
+                    
+                    if (eventSource.readyState === EventSource.CLOSED) {
+                        log('Connection was closed');
+                    }
+                };
+                
+            } catch (err) {
+                log(`❌ Failed to create EventSource: ${err}`);
+                updateStatus('error', 'Failed to create connection');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Test on page load
+        log('Page loaded. Ready to test SSE connection.');
+        log('Expected behavior:');
+        log('1. Click "Test SSE Connection"');
+        log('2. Should see "SSE connection opened successfully"');
+        log('3. Should receive status and section events');
+        log('4. Should complete with "Report complete!"');
+        log('');
+    </script>
+</body>
+</html>

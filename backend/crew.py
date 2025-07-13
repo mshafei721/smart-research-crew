@@ -10,19 +10,19 @@ import asyncio
 import sys
 import os
 import json
-from typing import List
+
 
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from rich.console import Console
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 
 # Import configuration and logging
-from config import settings, get_settings, validate_environment
+from config import get_settings, validate_environment
 from config.logging import (
     setup_logging,
     get_logger,

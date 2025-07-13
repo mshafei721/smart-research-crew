@@ -169,12 +169,12 @@ class SectionResearcher(LoggerMixin):
             "search_timeout": self.settings.search_timeout,
         }
 
-    def validate_output(self, output: str) -> Dict[str, Any]:
+    def validate_output(self, output) -> Dict[str, Any]:
         """
         Validate agent output format and content.
 
         Args:
-            output: Raw output from the agent
+            output: ReActAgentRunOutput from the agent
 
         Returns:
             Parsed and validated JSON data
@@ -185,7 +185,9 @@ class SectionResearcher(LoggerMixin):
         import json
 
         try:
-            data = json.loads(output.strip())
+            # Extract text from ReActAgentRunOutput object
+            output_text = output.result.text.strip()
+            data = json.loads(output_text)
 
             # Validate required fields
             if not isinstance(data, dict):

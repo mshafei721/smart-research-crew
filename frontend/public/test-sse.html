@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple SSE Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; border: 1px solid #ccc; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connecting { background: #fff3cd; }
+        .connected { background: #d4edda; }
+        .error { background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Simple SSE Connection Test</h1>
+    <p>Testing the proxy at the same origin as this page.</p>
+    
+    <button onclick="testSSE()">Test SSE Connection</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <div id="status" class="status">Ready to test</div>
+    <div id="log" class="log"></div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(className, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${className}`;
+            statusDiv.textContent = message;
+        }
+        
+        function testSSE() {
+            log('Starting SSE test...');
+            log(`Current origin: ${window.location.origin}`);
+            
+            const params = new URLSearchParams({
+                topic: 'Simple SSE Test',
+                guidelines: 'Just testing connection',
+                sections: 'Test Section'
+            });
+            
+            const url = `/sse?${params}`;
+            log(`Testing URL: ${url}`);
+            log(`Full URL: ${window.location.origin}${url}`);
+            
+            updateStatus('connecting', 'Connecting...');
+            
+            const eventSource = new EventSource(url);
+            
+            eventSource.onopen = function(e) {
+                log('✅ EventSource opened successfully!');
+                log(`ReadyState: ${eventSource.readyState}`);
+                updateStatus('connected', 'Connected!');
+            };
+            
+            eventSource.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    log(`📨 Received: ${data.type} - ${data.message || 'no message'}`);
+                } catch (err) {
+                    log(`📨 Raw data: ${e.data}`);
+                }
+            };
+            
+            eventSource.onerror = function(e) {
+                log(`❌ Error occurred!`);
+                log(`ReadyState: ${eventSource.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSED)`);
+                log(`URL: ${eventSource.url}`);
+                updateStatus('error', 'Connection failed');
+                
+                // Close after 10 seconds if still trying
+                setTimeout(() => {
+                    if (eventSource.readyState !== EventSource.CLOSED) {
+                        log('Closing connection after timeout');
+                        eventSource.close();
+                    }
+                }, 10000);
+            };
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        log('Page loaded. Click "Test SSE Connection" to start.');
+    </script>
+</body>
+</html>
