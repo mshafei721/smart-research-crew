@@ -9,7 +9,7 @@ import sys
 import uuid
 from typing import Optional
 from contextvars import ContextVar
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     from .settings import get_settings
@@ -46,7 +46,7 @@ class StructuredFormatter(logging.Formatter):
     def format(self, record):
         """Format log record with structured data."""
         log_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -202,14 +202,14 @@ class PerformanceLogger:
 
     def __enter__(self):
         """Start timing operation."""
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc)
         self.logger.debug(f"Starting operation: {self.operation}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Log operation completion time."""
         if self.start_time:
-            duration = (datetime.utcnow() - self.start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - self.start_time).total_seconds()
             if exc_type:
                 self.logger.error(
                     f"Operation failed: {self.operation}",
