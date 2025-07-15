@@ -15,25 +15,27 @@ class ResearchService(LoggerMixin):
     to fulfill a complete research request.
     """
 
-    async def conduct_research(self, request: ResearchRequest) -> str:
+    async def conduct_research(self, request: ResearchRequest):
         """
-        Conducts a full research process based on the given request.
+        Conducts a full research process based on the given request, yielding events for SSE.
 
         Args:
             request: The ResearchRequest object containing topic, guidelines, and sections.
 
-        Returns:
-            The final assembled report in Markdown format.
+        Yields:
+            Dict[str, Any]: SSE events with 'event' and 'data' fields.
 
         Raises:
-            RuntimeError: If any part of the research process fails.
+            RuntimeError: If any critical part of the research process fails.
         """
+        yield {"event": "start", "data": {"message": "Research process initiated.", "topic": request.topic}}
         self.log_info("Starting research process", topic=request.topic, sections=request.sections)
 
         sections_to_research = [s.strip() for s in request.sections.split(",")]
         researched_sections: List[Dict[str, Any]] = []
 
         # Step 1: Research each section concurrently
+        yield {"event": "phase_start", "data": {"phase": "Section Research", "message": "Starting section research..."}}
         async with log_performance("Section Research Phase", self.logger):
             tasks = []
             for section_title in sections_to_research:
@@ -52,7 +54,7 @@ class ResearchService(LoggerMixin):
                         f"Failed to research section '{section_title}': {result}",
                         exc_info=True,
                     )
-                    # Depending on requirements, you might skip this section or raise an error
+                    yield {"event": "section_error", "data": {"title": section_title, "error": str(result)}}
                     raise RuntimeError(f"Section research failed for '{section_title}')")
                 
                 researched_sections.append({
@@ -60,15 +62,19 @@ class ResearchService(LoggerMixin):
                     "content": result["content"],
                     "sources": result["sources"],
                 })
+                yield {"event": "section_complete", "data": {"title": section_title, "content_preview": result["content"][:100] + "...", "sources_count": len(result["sources"])}}
 
         # Step 2: Assemble the report
+        yield {"event": "phase_start", "data": {"phase": "Report Assembly", "message": "Assembling final report..."}}
         try:
             async with log_performance("Report Assembly Phase", self.logger):
                 assembler = ReportAssembler()
                 final_report = await assembler.run_assembly(json.dumps(researched_sections))
         except Exception as e:
             self.log_error("Report assembly failed", exc_info=True)
+            yield {"event": "assembly_error", "data": {"error": str(e)}}
             raise RuntimeError(f"Assembly failed: {str(e)}") from e
 
         self.log_info("Research process completed successfully", topic=request.topic)
-        return final_report
+        yield {"event": "report_complete", "data": {"report": final_report}}
+        yield {"event": "end", "data": "Research process finished."}

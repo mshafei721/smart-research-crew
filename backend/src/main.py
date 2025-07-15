@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status, BackgroundTasks
+from fastapi import FastAPI, Request, status, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from datetime import datetime, timezone
@@ -8,6 +8,10 @@ from sse_starlette.sse import EventSourceResponse
 import asyncio
 from src.config.logging import setup_logging, get_logger, set_request_context, clear_request_context, generate_request_id
 from src.services.research_service import ResearchService
+import uuid
+from typing import Dict
+import json
+from src.database import get_redis_connection
 
 app = FastAPI()
 
@@ -15,6 +19,12 @@ logger = get_logger(__name__)
 setup_logging()
 
 research_service = ResearchService()
+
+# Redis client for task state persistence
+redis_client = get_redis_connection()
+
+# In-memory cache for active research tasks to reduce Redis hits
+active_research_tasks: Dict[str, ResearchRequest] = {}
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -58,20 +68,46 @@ def get_app_settings():
     }
 
 @app.post("/research")
-async def submit_research_request(request: ResearchRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(research_service.conduct_research, request)
-    return {"message": "Research request received", "topic": request.topic}
+async def submit_research_request(request: ResearchRequest):
+    task_id = str(uuid.uuid4())
+    if redis_client:
+        redis_client.set(f"research_task:{task_id}", request.json())
+        redis_client.expire(f"research_task:{task_id}", 3600) # Expire after 1 hour
+    else:
+        # Fallback to in-memory if Redis is not available
+        active_research_tasks[task_id] = request
+
+    logger.info(f"Research request received: {request.topic}", extra={"task_id": task_id})
+    return {"message": "Research request received", "task_id": task_id}
 
 @app.get("/sse")
-async def sse_endpoint():
+async def sse_endpoint(task_id: str):
+    research_request = None
+    if redis_client:
+        task_data = redis_client.get(f"research_task:{task_id}")
+        if task_data:
+            research_request = ResearchRequest.parse_raw(task_data)
+    
+    if not research_request and task_id in active_research_tasks:
+        research_request = active_research_tasks[task_id]
+
+    if not research_request:
+        raise HTTPException(status_code=404, detail="Task ID not found")
+
     async def event_generator():
-        yield {"event": "connected", "data": "Connection established"}
-        await asyncio.sleep(1)
-        yield {"event": "message", "data": "Processing research request..."}
-        await asyncio.sleep(2)
-        yield {"event": "message", "data": "Research complete!"}
-        await asyncio.sleep(1)
-        yield {"event": "end", "data": "Stream closed"}
+        try:
+            async for event in research_service.conduct_research(research_request):
+                yield json.dumps(event)
+        except Exception as e:
+            logger.error(f"Error during SSE stream for task {task_id}: {e}", exc_info=True)
+            yield json.dumps({"event": "error", "data": str(e)})
+        finally:
+            # Clean up the task after completion or error
+            if redis_client:
+                redis_client.delete(f"research_task:{task_id}")
+            elif task_id in active_research_tasks:
+                del active_research_tasks[task_id]
+            logger.info(f"Cleaned up task {task_id}")
 
     return EventSourceResponse(event_generator())
 

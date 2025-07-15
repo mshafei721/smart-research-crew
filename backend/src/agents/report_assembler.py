@@ -8,13 +8,17 @@ into a cohesive, professionally formatted report.
 import textwrap
 import json
 from typing import Dict, List, Any
+import asyncio
 
 from beeai_framework.agents.react import ReActAgent
 from beeai_framework.backend.chat import ChatModel
-from beeai_framework.memory.unconstrained_memory import UnconstrainedMemory
+from src.memory.redis_memory import RedisMemory
 
 from src.config.settings import get_settings
 from src.config.logging import LoggerMixin
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
 
 
 class ReportAssembler(LoggerMixin):
@@ -81,7 +85,7 @@ class ReportAssembler(LoggerMixin):
             self.agent = ReActAgent(
                 llm=ChatModel.from_name(self.settings.llm_model),
                 tools=[],  # No tools needed for assembly
-                memory=UnconstrainedMemory(),
+                memory=RedisMemory(session_id="report_assembler", ttl=self.settings.cache_research_ttl),
             )
 
             self.log_info("ReportAssembler initialized successfully")
@@ -375,7 +379,7 @@ class ReportAssembler(LoggerMixin):
 
     async def run_assembly(self, sections_data: str) -> str:
         """
-        Run report assembly for the given sections data with comprehensive instructions.
+        Run report assembly for the given sections data with comprehensive instructions and retry logic.
 
         Args:
             sections_data: JSON string containing section data
@@ -384,28 +388,35 @@ class ReportAssembler(LoggerMixin):
             Validated assembled report content
 
         Raises:
-            ValueError: If input/output validation fails
-            RuntimeError: If assembly execution fails
+            ValueError: If input/output validation fails after all retries
+            RuntimeError: If assembly execution fails after all retries
         """
-        try:
-            # Validate input first
-            validated_sections = self.validate_input(sections_data)
+        for attempt in range(MAX_RETRIES):
+            try:
+                # Validate input first
+                validated_sections = self.validate_input(sections_data)
 
-            self.log_info("Starting report assembly", section_count=len(validated_sections))
+                self.log_info("Starting report assembly", section_count=len(validated_sections), attempt=attempt + 1)
 
-            # Combine instructions with the sections data
-            full_prompt = f"{self.instructions}\n\nSections Data: {sections_data}"
+                # Combine instructions with the sections data
+                full_prompt = f"{self.instructions}\n\nSections Data: {sections_data}"
 
-            # Run the agent with the enhanced prompt
-            raw_output = await self.agent.run(prompt=full_prompt)
+                # Run the agent with the enhanced prompt
+                raw_output = await self.agent.run(prompt=full_prompt)
 
-            self.log_info("Report assembly completed")
+                self.log_info("Report assembly completed", attempt=attempt + 1)
 
-            # Validate and clean the output
-            validated_report = self.validate_output(raw_output)
+                # Validate and clean the output
+                validated_report = self.validate_output(raw_output)
 
-            return validated_report
+                return validated_report
 
-        except Exception as e:
-            self.log_error("Report assembly failed", exc_info=True)
-            raise RuntimeError(f"Assembly failed: {str(e)}") from e
+            except Exception as e:
+                self.log_error(
+                    f"Report assembly failed on attempt {attempt + 1}", exc_info=True
+                )
+                if attempt < MAX_RETRIES - 1:
+                    self.log_warning(f"Retrying in {RETRY_DELAY} seconds...")
+                    await asyncio.sleep(RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"Assembly failed after {MAX_RETRIES} attempts: {str(e)}") from e

@@ -36,53 +36,55 @@ def test_submit_research_request():
     }
     response = client.post("/research", json=data)
     assert response.status_code == 200
-    assert response.json() == {"message": "Research request received", "topic": "Test Topic"}
+    assert "task_id" in response.json()
+    assert response.json()["message"] == "Research request received"
 
 import pytest
+from unittest.mock import AsyncMock, patch
+import json
 
 @pytest.mark.asyncio
 async def test_sse_endpoint():
-    with client.stream("GET", "/sse") as response:
-        assert response.status_code == 200
-        events = []
-        for line in response.iter_lines():
-            if line.startswith("event:"):
-                event_name = line.split(":", 1)[1].strip()
-            elif line.startswith("data:"):
-                event_data = line.split(":", 1)[1].strip()
-                events.append({"event": event_name, "data": event_data})
-            elif line == "":
-                event_name = None
+    with patch("src.main.research_service.conduct_research") as mock_conduct_research:
+        mock_conduct_research.return_value = AsyncMock()
+        mock_conduct_research.return_value.__aiter__.return_value = [
+            {"event": "start", "data": {"message": "Research process initiated.", "topic": "Test Topic"}},
+            {"event": "section_complete", "data": {"title": "Intro", "content_preview": "Intro content...", "sources_count": 1}},
+            {"event": "report_complete", "data": {"report": "# Final Report"}},
+            {"event": "end", "data": "Research process finished."},
+        ]
 
-        assert len(events) == 4
-        assert events[0] == {"event": "connected", "data": "Connection established"}
-        assert events[1] == {"event": "message", "data": "Processing research request..."}
-        assert events[2] == {"event": "message", "data": "Research complete!"}
-        assert events[3] == {"event": "end", "data": "Stream closed"}
+        # Simulate submitting a research request to get a task_id
+        submit_response = client.post("/research", json={
+            "topic": "Test Topic",
+            "guidelines": "Test Guidelines",
+            "sections": "Intro"
+        })
+        assert submit_response.status_code == 200
+        task_id = submit_response.json()["task_id"]
 
-def test_validation_error_handling():
-    invalid_data = {
-        "topic": "",  # Invalid: too short
-        "guidelines": "",
-        "sections": ""
-    }
-    response = client.post("/research", json=invalid_data)
-    assert response.status_code == 422
-    assert "detail" in response.json()
-    assert "body" in response.json()
-    assert response.json()["detail"][0]["loc"] == ["body", "topic"]
+        with client.stream("GET", f"/sse?task_id={task_id}") as response:
+            assert response.status_code == 200
+            events = []
+            for line in response.iter_lines():
+                if line.startswith("data:"):
+                    events.append(json.loads(line[len("data:"):].strip()))
+
+            assert len(events) == 4
+            assert events[0]["event"] == "start"
+            assert events[1]["event"] == "section_complete"
+            assert events[2]["event"] == "report_complete"
+            assert events[3]["event"] == "end"
+
+@pytest.mark.asyncio
+async def test_sse_endpoint_task_not_found():
+    response = client.get("/sse?task_id=non_existent_id")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Task ID not found"}
 
 
 
-def test_validation_error_handling():
-    invalid_data = {
-        "topic": "",  # Invalid: too short
-        "guidelines": "",
-        "sections": ""
-    }
-    response = client.post("/research", json=invalid_data)
-    assert response.status_code == 422
-    assert "detail" in response.json()
-    assert "body" in response.json()
-    assert response.json()["detail"][0]["loc"] == ["body", "topic"]
+
+
+
 

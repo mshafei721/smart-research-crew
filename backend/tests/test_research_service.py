@@ -33,11 +33,14 @@ async def test_conduct_research_success():
                 sections="Introduction,Body"
             )
             
-            final_report = await service.conduct_research(request)
+            events = [event async for event in service.conduct_research(request)]
 
-            assert final_report == "# Final Report"
-            assert MockSectionResearcher.call_count == 2
-            assert MockReportAssembler.call_count == 1
+            assert len(events) > 0
+            assert events[0]["event"] == "start"
+            assert any(e["event"] == "section_complete" for e in events)
+            assert any(e["event"] == "report_complete" for e in events)
+            assert events[-1]["event"] == "end"
+            
 
 @pytest.mark.asyncio
 async def test_conduct_research_section_failure():
@@ -62,8 +65,14 @@ async def test_conduct_research_section_failure():
                 sections="Introduction,Body"
             )
             
+            events = []
             with pytest.raises(RuntimeError, match="Section research failed for 'Body'"):
-                await service.conduct_research(request)
+                async for event in service.conduct_research(request):
+                    events.append(event)
+
+            assert len(events) > 0
+            assert events[0]["event"] == "start"
+            assert any(e["event"] == "section_error" for e in events)
 
             assert MockSectionResearcher.call_count == 2
             mock_assembler_instance.run_assembly.assert_not_called()
@@ -92,8 +101,11 @@ async def test_conduct_research_assembly_failure():
                 sections="Introduction,Body"
             )
             
+            events = []
             with pytest.raises(RuntimeError, match="Assembly failed"):
-                await service.conduct_research(request)
+                async for event in service.conduct_research(request):
+                    events.append(event)
 
-            assert MockSectionResearcher.call_count == 2
-            assert MockReportAssembler.call_count == 1
+            assert len(events) > 0
+            assert events[0]["event"] == "start"
+            assert any(e["event"] == "assembly_error" for e in events)

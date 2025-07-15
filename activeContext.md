@@ -1,1 +1,1 @@
-Current task: Integrate agents with the FastAPI backend.
+Current task: Implement agent state management for long-running tasks.

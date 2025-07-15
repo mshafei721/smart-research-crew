@@ -18,11 +18,11 @@
     - [x] Refine `ReportAssembler` agent for report generation.
   - [ ] Implement agent communication protocols.
     - [x] Implement robust inter-agent communication.
-    - [ ] Integrate agents with the FastAPI backend.
+    - [x] Integrate agents with the FastAPI backend.
   - [ ] **Agent Enhancements**
-    - [ ] Integrate external search tools (e.g., DuckDuckGo, custom search).
-    - [ ] Implement agent memory persistence (e.g., using Redis).
-    - [ ] Add error recovery and retry mechanisms for agent tasks.
+    - [x] Integrate external search tools (e.g., DuckDuckGo, custom search).
+    - [x] Implement agent memory persistence (e.g., using Redis).
+    - [x] Add error recovery and retry mechanisms for agent tasks.
     - [ ] Implement agent state management for long-running tasks.
 
 - [ ] **Phase 3: Frontend Integration**

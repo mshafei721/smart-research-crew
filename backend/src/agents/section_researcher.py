@@ -7,14 +7,18 @@ with web search capabilities and structured JSON output.
 
 import textwrap
 from typing import Dict, Any
+import asyncio
 
 from beeai_framework.agents.react import ReActAgent
 from beeai_framework.tools.search.duckduckgo import DuckDuckGoSearchTool
 from beeai_framework.backend.chat import ChatModel
-from beeai_framework.memory.unconstrained_memory import UnconstrainedMemory
+from src.memory.redis_memory import RedisMemory
 
 from src.config.settings import get_settings
 from src.config.logging import LoggerMixin
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
 
 
 class SectionResearcher(LoggerMixin):
@@ -91,7 +95,7 @@ class SectionResearcher(LoggerMixin):
             self.agent = ReActAgent(
                 llm=ChatModel.from_name(self.settings.llm_model),
                 tools=[DuckDuckGoSearchTool()],
-                memory=UnconstrainedMemory(),
+                memory=RedisMemory(session_id=f"section_researcher_{self.section}", ttl=self.settings.cache_section_ttl),
             )
 
             self.log_info("SectionResearcher initialized successfully")
@@ -253,7 +257,7 @@ class SectionResearcher(LoggerMixin):
 
     async def run_research(self, query: str) -> Dict[str, Any]:
         """
-        Run research for the given query with comprehensive instructions.
+        Run research for the given query with comprehensive instructions and retry logic.
 
         Args:
             query: The research query/topic
@@ -262,25 +266,25 @@ class SectionResearcher(LoggerMixin):
             Parsed and validated research results
 
         Raises:
-            ValueError: If output validation fails
-            RuntimeError: If research execution fails
+            ValueError: If output validation fails after all retries
+            RuntimeError: If research execution fails after all retries
         """
-        try:
-            # Combine instructions with the user query
-            full_prompt = f"{self.instructions}\n\nResearch Query: {query}"
-
-            self.log_info("Starting research", query=query, section=self.section)
-
-            # Run the agent with the enhanced prompt
-            raw_output = await self.agent.run(prompt=full_prompt)
-
-            self.log_info("Research completed", section=self.section)
-
-            # Validate and parse the output
-            validated_data = self.validate_output(raw_output)
-
-            return validated_data
-
-        except Exception as e:
-            self.log_error("Research execution failed", exc_info=True, query=query)
-            raise RuntimeError(f"Research failed: {str(e)}") from e
+        for attempt in range(MAX_RETRIES):
+            try:
+                self.log_info("Starting research", query=query, section=self.section, attempt=attempt + 1)
+                full_prompt = f"{self.instructions}\n\nResearch Query: {query}"
+                raw_output = await self.agent.run(prompt=full_prompt)
+                validated_data = self.validate_output(raw_output)
+                self.log_info("Research completed", section=self.section, attempt=attempt + 1)
+                return validated_data
+            except Exception as e:
+                self.log_error(
+                    f"Research execution failed on attempt {attempt + 1}",
+                    exc_info=True,
+                    query=query,
+                )
+                if attempt < MAX_RETRIES - 1:
+                    self.log_warning(f"Retrying in {RETRY_DELAY} seconds...")
+                    await asyncio.sleep(RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"Research failed after {MAX_RETRIES} attempts: {str(e)}") from e
