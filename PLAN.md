@@ -14,10 +14,10 @@
 
 - [ ] **Phase 2: Agent Implementation**
   - [x] Define agent roles and responsibilities.
-    - [ ] Refine `SectionResearcher` agent for focused research.
-    - [ ] Refine `ReportAssembler` agent for report generation.
+    - [x] Refine `SectionResearcher` agent for focused research.
+    - [x] Refine `ReportAssembler` agent for report generation.
   - [ ] Implement agent communication protocols.
-    - [ ] Implement robust inter-agent communication.
+    - [x] Implement robust inter-agent communication.
     - [ ] Integrate agents with the FastAPI backend.
   - [ ] **Agent Enhancements**
     - [ ] Integrate external search tools (e.g., DuckDuckGo, custom search).

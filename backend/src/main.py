@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from datetime import datetime, timezone
@@ -7,11 +7,14 @@ from src.config.settings import get_settings
 from sse_starlette.sse import EventSourceResponse
 import asyncio
 from src.config.logging import setup_logging, get_logger, set_request_context, clear_request_context, generate_request_id
+from src.services.research_service import ResearchService
 
 app = FastAPI()
 
 logger = get_logger(__name__)
 setup_logging()
+
+research_service = ResearchService()
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -55,10 +58,8 @@ def get_app_settings():
     }
 
 @app.post("/research")
-async def submit_research_request(request: ResearchRequest):
-    # In a real application, this would trigger a background task
-    # to perform the research and stream updates via SSE.
-    # For now, we'll just return a success message.
+async def submit_research_request(request: ResearchRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(research_service.conduct_research, request)
     return {"message": "Research request received", "topic": request.topic}
 
 @app.get("/sse")

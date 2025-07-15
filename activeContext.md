@@ -1,1 +1,1 @@
-Current task: Refine `SectionResearcher` agent for focused research.
+Current task: Integrate agents with the FastAPI backend.

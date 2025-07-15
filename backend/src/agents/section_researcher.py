@@ -13,8 +13,8 @@ from beeai_framework.tools.search.duckduckgo import DuckDuckGoSearchTool
 from beeai_framework.backend.chat import ChatModel
 from beeai_framework.memory.unconstrained_memory import UnconstrainedMemory
 
-from config import get_settings
-from config.logging import LoggerMixin
+from src.config.settings import get_settings
+from src.config.logging import LoggerMixin
 
 
 class SectionResearcher(LoggerMixin):
@@ -121,40 +121,34 @@ class SectionResearcher(LoggerMixin):
             {{"content": "your markdown content here", "sources": ["url1", "url2", "url3"]}}
 
             RESEARCH PROCESS:
-            1. Search the web for {self.max_sources} high-quality, recent, and credible sources
-            2. Analyze the information to create comprehensive section content
-            3. Write well-structured Markdown content (maximum {self.max_content_words} words)
-            4. Include proper citations using [1], [2], [3] format within the content
-            5. Return structured JSON with content and source URLs
+            1. Search the web for {self.max_sources} high-quality, recent, and credible sources relevant to "{self.section}".
+            2. Analyze the gathered information to synthesize comprehensive and well-structured content for the section.
+            3. Write the content in Markdown format, ensuring it does not exceed {self.max_content_words} words.
+            4. For every piece of information or statistic, include proper citations using the format [1], [2], [3], etc., corresponding to the order of sources in the "sources" list.
+            5. If no relevant information is found after thorough searching, return an empty content string and an empty sources list: {{\"content\": \"\", \"sources\": []}}.
 
             CONTENT QUALITY REQUIREMENTS:
-            - Use proper Markdown formatting (headers, lists, emphasis)
-            - Include specific facts, statistics, and examples where relevant
-            - Maintain academic rigor and factual accuracy
-            - Ensure citations are properly integrated into the text
-            - Focus on recent information (prefer sources from last 2-3 years)
+            - Use clear, concise, and professional language.
+            - Employ proper Markdown formatting (e.g., headers, bullet points, bold/italic text) to enhance readability.
+            - Include specific facts, figures, and examples to support claims.
+            - Maintain academic rigor and factual accuracy.
+            - Ensure all claims are backed by cited sources.
+            - Prioritize recent information (ideally from the last 2-3 years) from credible sources.
 
             SOURCE QUALITY REQUIREMENTS:
-            - Prioritize authoritative sources (.edu, .gov, reputable organizations)
-            - Include diverse perspectives and up-to-date information
-            - Avoid low-quality or unreliable sources
-            - Ensure URLs are accessible and relevant
+            - Prioritize authoritative and reputable sources (e.g., .edu, .gov, well-known research institutions, established news organizations).
+            - Include a diverse range of sources to provide a balanced perspective.
+            - Verify that all URLs are accessible and directly relevant to the content.
+            - Avoid blogs, opinion pieces, or unreliable sources unless explicitly necessary and noted.
 
             OUTPUT CONSTRAINTS:
-            - Return ONLY the JSON object - no additional text, explanations, or formatting
-            - The JSON must be valid and parseable
-            - Do not include any text before or after the JSON
-            - Ensure proper JSON escaping for quotes and special characters
-            - Maximum {len(self.guidelines) + 500} characters for guidelines consideration
+            - Return ONLY the JSON object - no additional text, explanations, or formatting outside the JSON.
+            - The JSON MUST be valid and parseable.
+            - Ensure proper JSON escaping for all quotes and special characters within the "content" field.
+            - The total length of the JSON output should be reasonable, considering the content and source limits.
 
-            EXAMPLE OUTPUT:
-            {{\"content\": \"## Key Findings\\n\\nRecent research shows [1] that artificial
-            intelligence adoption has increased by 45% in 2023 [2]. This trend
-            indicates...\\n\\n### Impact Analysis\\n\\n- **Efficiency**: 60% improvement
-            in processing time [3]\\n- **Cost**: Average reduction of $50k annually [1]\",
-            \"sources\": [\"https://example.edu/ai-research-2023\",
-            \"https://techreport.org/ai-adoption-trends\",
-            \"https://industry-analysis.com/efficiency-study\"]}}
+            EXAMPLE OUTPUT (for a section on "Introduction to AI"):
+            {{"content": "## Introduction to Artificial Intelligence\n\nArtificial Intelligence (AI) is a rapidly evolving field that aims to create machines capable of performing tasks that typically require human intelligence [1]. This includes learning, problem-solving, perception, and language understanding. Recent advancements in deep learning and neural networks have significantly propelled AI capabilities, leading to breakthroughs in various sectors [2].\n\n### Historical Context\n\nThe concept of AI dates back to the 1950s, with early pioneers like Alan Turing exploring the theoretical foundations of intelligent machines [3]. The field has experienced periods of rapid growth and stagnation, often referred to as 'AI winters,' but current progress suggests a sustained period of innovation [4].", "sources": ["https://example.edu/ai-intro", "https://techcrunch.com/ai-breakthroughs", "https://historyofai.org/turing", "https://ai-research.net/ai-winters"]}}
         """
         )
 

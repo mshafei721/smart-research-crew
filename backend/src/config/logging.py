@@ -200,19 +200,20 @@ class PerformanceLogger:
         self.logger = logger
         self.start_time = None
 
-    def __enter__(self):
-        """Start timing operation."""
+    async def __aenter__(self):
+        """Start timing operation (async)."""
         self.start_time = datetime.now(timezone.utc)
         self.logger.debug(f"Starting operation: {self.operation}")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Log operation completion time."""
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Log operation completion time (async)."""
         if self.start_time:
             duration = (datetime.now(timezone.utc) - self.start_time).total_seconds()
             if exc_type:
                 self.logger.error(
                     f"Operation failed: {self.operation}",
+                    exc_info=(exc_type, exc_val, exc_tb),
                     extra={"duration_seconds": duration, "error": str(exc_val)},
                 )
             else:

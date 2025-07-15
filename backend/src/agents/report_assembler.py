@@ -13,8 +13,8 @@ from beeai_framework.agents.react import ReActAgent
 from beeai_framework.backend.chat import ChatModel
 from beeai_framework.memory.unconstrained_memory import UnconstrainedMemory
 
-from config import get_settings
-from config.logging import LoggerMixin
+from src.config.settings import get_settings
+from src.config.logging import LoggerMixin
 
 
 class ReportAssembler(LoggerMixin):
@@ -123,58 +123,51 @@ class ReportAssembler(LoggerMixin):
             # [Intelligent Report Title Based on Content]
             {metadata_section}
             ## Executive Summary
-            [2-3 sentence overview of the key findings and insights]
+            [A concise, 2-3 sentence overview of the entire report, highlighting key findings and insights. This should be a high-level summary of the most important information from all sections.]
 
             ## Table of Contents
-            1. [Section 1 Name]
-            2. [Section 2 Name]
-            3. [Additional sections as needed]
+            [Automatically generated, numbered list of all main sections (e.g., 1. Introduction, 2. Methodology).]
 
             ## 1. [Section 1 Name]
-            [Section content with proper citations [1], [2], etc.]
+            [Original content from Section 1, with citations re-numbered sequentially across the entire report.]
 
             ## 2. [Section 2 Name]
-            [Section content with proper citations continuing numbering]
+            [Original content from Section 2, with citations re-numbered sequentially.]
 
-            [Continue for all sections...]
+            [Continue for all sections, ensuring smooth transitions and logical flow between them...]
 
             ## Key Insights
-            [3-5 bullet points summarizing the most important findings across all sections]
+            [3-5 concise bullet points summarizing the most critical and actionable insights derived from the entire research. These should be distinct from the executive summary and focus on deeper takeaways.]
 
             ## References
-            [1] First Source URL
-            [2] Second Source URL
-            [Deduplicated list of all sources in order of appearance]
+            [A single, deduplicated, and sequentially numbered list of all unique source URLs referenced in the entire report. Format as [1] URL, [2] URL, etc.]
 
             PROCESSING REQUIREMENTS:
-            1. **Intelligent Title Generation**: Create a descriptive title based on the
-               section content themes
-            2. **Executive Summary**: Synthesize key points from all sections into 2-3 sentences
-            3. **Content Integration**: Ensure smooth flow between sections
-            4. **Citation Management**: Renumber citations sequentially across the entire document
-            5. **Source Deduplication**: Remove duplicate sources and maintain proper numbering
-            6. **Quality Enhancement**: Fix any formatting inconsistencies or grammatical issues
-            7. **Key Insights**: Extract and highlight the most important findings
+            1. **Intelligent Title Generation**: Analyze the content of all sections to create a comprehensive and descriptive main report title.
+            2. **Executive Summary Creation**: Synthesize the most important information from all provided sections into a brief, impactful executive summary.
+            3. **Content Integration**: Seamlessly combine the content from all sections. Ensure logical flow and add transitional sentences or paragraphs where necessary to maintain coherence.
+            4. **Citation Management**: Re-number all citations sequentially across the *entire* report. If a source is cited multiple times, it should retain its *first* assigned number throughout the report.
+            5. **Source Deduplication**: Compile all sources from all sections into a single list. Remove any duplicate URLs. The final "References" list should contain only unique URLs, ordered by their first appearance in the report.
+            6. **Quality Enhancement**: Review the combined content for any formatting inconsistencies, grammatical errors, or stylistic issues. Ensure a professional and academic tone.
+            7. **Key Insights Extraction**: Identify and articulate 3-5 most significant findings or conclusions from the aggregated research, presenting them as bullet points.
 
             FORMATTING STANDARDS:
-            - Use consistent heading hierarchy (# for title, ## for main sections)
-            - Maintain proper Markdown formatting throughout
-            - Ensure citations are properly formatted as [1], [2], etc.
-            - Include proper line breaks and spacing
-            - Maximum report length: {self.max_report_length} characters
+            - Use consistent Markdown heading hierarchy: # for the main title, ## for main sections (Executive Summary, Table of Contents, numbered sections, Key Insights, References).
+            - Ensure all text is properly formatted (e.g., bolding, italics, lists) as appropriate for a professional report.
+            - Citations must strictly follow the [number] format (e.g., [1], [2]).
+            - Maintain proper line breaks and spacing for readability.
+            - The final report should not exceed {self.max_report_length} characters.
 
             CONTENT QUALITY:
-            - Preserve all original research content and findings
-            - Maintain academic tone and professional presentation
-            - Ensure logical flow and coherent narrative
-            - Include all relevant sources and citations
-            - Add transitional text between sections if needed for coherence
+            - Preserve the accuracy and integrity of all original research content.
+            - Maintain an academic and professional tone throughout the report.
+            - Ensure the narrative is logical, coherent, and easy to follow.
+            - All relevant sources must be included and correctly cited.
 
             OUTPUT CONSTRAINTS:
-            - Return ONLY the final Markdown content
-            - No explanations, comments, or additional text
-            - Ensure proper Markdown syntax throughout
-            - Must be complete and ready for immediate use
+            - Return ONLY the final Markdown content of the report. Do NOT include any conversational text, explanations, or additional formatting outside the report itself.
+            - The output MUST be a complete and ready-to-use Markdown document.
+            - Ensure proper Markdown syntax throughout.
 
             EXAMPLE STRUCTURE:
             # Artificial Intelligence in Healthcare: Current Trends and Future Prospects
